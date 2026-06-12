@@ -129,8 +129,30 @@ TEST_F(AuthorizedUserCredentialsTest, ParseSimple) {
 }
 
 /// @test Verify that parsing an authorized user account JSON string with a
-/// non-empty universe_domain works.
-TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithUniverseDomain) {
+/// google default universe_domain works.
+TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithGoogleUniverseDomain) {
+  std::string config = R"""({
+      "client_id": "a-client-id.example.com",
+      "client_secret": "a-123456ABCDEF",
+      "refresh_token": "1/THETOKEN",
+      "token_uri": "https://oauth2.googleapis.com/test_endpoint",
+      "type": "magic_type",
+      "universe_domain": "googleapis.com"
+})""";
+
+  auto actual =
+      ParseAuthorizedUserCredentials(config, "test-data", "unused-uri");
+  ASSERT_STATUS_OK(actual);
+  EXPECT_EQ("a-client-id.example.com", actual->client_id);
+  EXPECT_EQ("a-123456ABCDEF", actual->client_secret);
+  EXPECT_EQ("1/THETOKEN", actual->refresh_token);
+  EXPECT_EQ("https://oauth2.googleapis.com/test_endpoint", actual->token_uri);
+  EXPECT_EQ(actual->universe_domain, "googleapis.com");
+}
+
+/// @test Verify that parsing an authorized user account JSON string with a
+/// custom universe_domain fails.
+TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithCustomUniverseDomainRejection) {
   std::string config = R"""({
       "client_id": "a-client-id.example.com",
       "client_secret": "a-123456ABCDEF",
@@ -142,12 +164,12 @@ TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithUniverseDomain) {
 
   auto actual =
       ParseAuthorizedUserCredentials(config, "test-data", "unused-uri");
-  ASSERT_STATUS_OK(actual);
-  EXPECT_EQ("a-client-id.example.com", actual->client_id);
-  EXPECT_EQ("a-123456ABCDEF", actual->client_secret);
-  EXPECT_EQ("1/THETOKEN", actual->refresh_token);
-  EXPECT_EQ("https://oauth2.googleapis.com/test_endpoint", actual->token_uri);
-  EXPECT_EQ(actual->universe_domain, "my-ud.net");
+  EXPECT_THAT(
+      actual,
+      StatusIs(
+          StatusCode::kInvalidArgument,
+          HasSubstr("custom universe domains are not supported for authorized "
+                    "user credentials. Found: my-ud.net")));
 }
 
 /// @test Verify that parsing an authorized user account JSON string with a

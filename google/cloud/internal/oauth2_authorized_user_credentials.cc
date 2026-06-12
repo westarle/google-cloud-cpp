@@ -54,6 +54,13 @@ StatusOr<AuthorizedUserCredentialsInfo> ParseAuthorizedUserCredentials(
 
   auto universe_domain = GetUniverseDomainFromCredentialsJson(credentials);
   if (!universe_domain.ok()) return std::move(universe_domain).status();
+  if (*universe_domain != GoogleDefaultUniverseDomain()) {
+    return internal::InvalidArgumentError(
+        "Invalid AuthorizedUserCredentials, custom universe domains are not "
+        "supported for authorized user credentials. Found: " +
+            *universe_domain,
+        GCP_ERROR_INFO());
+  }
 
   return AuthorizedUserCredentialsInfo{
       credentials.value(client_id_key, ""),
