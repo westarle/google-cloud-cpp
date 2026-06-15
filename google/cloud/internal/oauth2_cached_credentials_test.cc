@@ -19,6 +19,8 @@
 #include "google/cloud/testing_util/status_matchers.h"
 #include <gmock/gmock.h>
 #include <sstream>
+#include <thread>
+#include <vector>
 
 namespace google {
 namespace cloud {
@@ -192,6 +194,44 @@ TEST(CachedCredentials, ProjectIdWithOptions) {
       .WillOnce(Return(StatusOr<std::string>("test-project-id")));
   CachedCredentials tested(mock);
   EXPECT_THAT(tested.project_id(Options{}), IsOkAndHolds("test-project-id"));
+}
+
+TEST(CachedCredentials, ConcurrentGetTokenPreventsThunderingHerd) {
+  auto mock = std::make_shared<MockCredentials>();
+  auto const now = std::chrono::system_clock::now();
+  auto const tp = now;
+  auto const expected = AccessToken{"test-token", now + std::chrono::hours(1)};
+
+  // Expect GetToken to be called exactly once. We use a short sleep in the mock
+  // to ensure other threads have started and block on the mutex.
+  EXPECT_CALL(*mock, GetToken(tp))
+      .WillOnce([&](std::chrono::system_clock::time_point) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return expected;
+      });
+
+  CachedCredentials tested(mock);
+
+  int const thread_count = 10;
+  std::vector<std::thread> threads;
+  threads.reserve(thread_count);
+
+  std::vector<StatusOr<AccessToken>> results(thread_count);
+
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([&tested, tp, &results, i]() {
+      results[i] = tested.GetToken(tp);
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  for (int i = 0; i < thread_count; ++i) {
+    ASSERT_STATUS_OK(results[i]);
+    EXPECT_EQ(*results[i], expected);
+  }
 }
 
 }  // namespace
