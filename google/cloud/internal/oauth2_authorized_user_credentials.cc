@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "google/cloud/internal/oauth2_authorized_user_credentials.h"
+#include "google/cloud/common_options.h"
 #include "google/cloud/internal/make_status.h"
 #include "google/cloud/internal/oauth2_universe_domain.h"
 #include <nlohmann/json.hpp>
@@ -55,6 +56,11 @@ StatusOr<AuthorizedUserCredentialsInfo> ParseAuthorizedUserCredentials(
   auto universe_domain = GetUniverseDomainFromCredentialsJson(credentials);
   if (!universe_domain.ok()) return std::move(universe_domain).status();
 
+  absl::optional<std::string> quota_project_id;
+  if (credentials.count("quota_project_id") > 0) {
+    quota_project_id = credentials.value("quota_project_id", "");
+  }
+
   return AuthorizedUserCredentialsInfo{
       credentials.value(client_id_key, ""),
       credentials.value(client_secret_key, ""),
@@ -63,7 +69,8 @@ StatusOr<AuthorizedUserCredentialsInfo> ParseAuthorizedUserCredentials(
       // "token_uri" attribute in the JSON object.  In this case, we try using
       // the default value.
       credentials.value("token_uri", default_token_uri),
-      *std::move(universe_domain)};
+      *std::move(universe_domain),
+      std::move(quota_project_id)};
 }
 
 StatusOr<AccessToken> ParseAuthorizedUserRefreshResponse(
@@ -110,6 +117,11 @@ StatusOr<AccessToken> AuthorizedUserCredentials::GetToken(
   if (!response.ok()) return std::move(response).status();
   if (IsHttpError(**response)) return AsStatus(std::move(**response));
   return ParseAuthorizedUserRefreshResponse(**response, tp);
+}
+
+absl::optional<std::string> AuthorizedUserCredentials::quota_project_id() const {
+  if (options_.has<UserProjectOption>()) return absl::nullopt;
+  return info_.quota_project_id;
 }
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

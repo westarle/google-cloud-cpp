@@ -37,6 +37,7 @@ struct AuthorizedUserCredentialsInfo {
   std::string refresh_token;
   std::string token_uri;
   std::string universe_domain;
+  absl::optional<std::string> quota_project_id;
 };
 
 /// Parses a user credentials JSON string into an AuthorizedUserCredentialsInfo.
@@ -84,6 +85,8 @@ class AuthorizedUserCredentials : public Credentials {
    */
   StatusOr<AccessToken> GetToken(
       std::chrono::system_clock::time_point tp) override;
+
+  absl::optional<std::string> quota_project_id() const override;
 
  private:
   AuthorizedUserCredentialsInfo info_;

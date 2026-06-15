@@ -37,6 +37,11 @@ Credentials::AuthenticationHeaders(std::chrono::system_clock::time_point tp,
   if (allowed_locations.ok() && !allowed_locations->empty()) {
     headers.push_back(*std::move(allowed_locations));
   }
+  auto quota_project = quota_project_id();
+  if (quota_project && !quota_project->empty()) {
+    headers.push_back(rest_internal::HttpHeader{"x-goog-user-project",
+                                                *std::move(quota_project)});
+  }
   return headers;
 }
 

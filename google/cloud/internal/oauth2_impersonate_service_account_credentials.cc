@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "google/cloud/internal/oauth2_impersonate_service_account_credentials.h"
+#include "google/cloud/common_options.h"
 #include "google/cloud/internal/make_status.h"
 #include "google/cloud/internal/oauth2_credential_constants.h"
 #include "google/cloud/internal/unified_rest_credentials.h"
@@ -137,18 +138,23 @@ ParseImpersonatedServiceAccountCredentials(std::string const& content,
 
 ImpersonateServiceAccountCredentials::ImpersonateServiceAccountCredentials(
     google::cloud::internal::ImpersonateServiceAccountConfig const& config,
-    HttpClientFactory client_factory)
+    HttpClientFactory client_factory,
+    absl::optional<std::string> quota_project_id)
     : ImpersonateServiceAccountCredentials(
           config, MakeMinimalIamCredentialsRestStub(
                       rest_internal::MapCredentials(*config.base_credentials()),
-                      config.options(), std::move(client_factory))) {}
+                      config.options(), std::move(client_factory)),
+          std::move(quota_project_id)) {}
 
 ImpersonateServiceAccountCredentials::ImpersonateServiceAccountCredentials(
     google::cloud::internal::ImpersonateServiceAccountConfig const& config,
-    std::shared_ptr<MinimalIamCredentialsRest> stub)
+    std::shared_ptr<MinimalIamCredentialsRest> stub,
+    absl::optional<std::string> quota_project_id)
     : stub_(std::move(stub)),
       access_token_request_(MakeRequest(config)),
-      allowed_locations_request_({config.target_service_account()}) {}
+      allowed_locations_request_({config.target_service_account()}),
+      options_(config.options()),
+      quota_project_id_(std::move(quota_project_id)) {}
 
 StatusOr<AccessToken> ImpersonateServiceAccountCredentials::GetToken(
     std::chrono::system_clock::time_point /*tp*/) {
@@ -163,6 +169,11 @@ ImpersonateServiceAccountCredentials::AllowedLocationsRequest() const {
 #else
   return std::monostate{};
 #endif
+}
+
+absl::optional<std::string> ImpersonateServiceAccountCredentials::quota_project_id() const {
+  if (options_.has<UserProjectOption>()) return absl::nullopt;
+  return quota_project_id_;
 }
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

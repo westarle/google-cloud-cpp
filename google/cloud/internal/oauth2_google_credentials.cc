@@ -96,7 +96,7 @@ StatusOr<std::unique_ptr<Credentials>> LoadCredsFromString(
         *std::move(source_creds), opts, std::move(client_factory));
     return std::unique_ptr<Credentials>(
         std::make_unique<ImpersonateServiceAccountCredentials>(
-            config, std::move(rest_stub)));
+            config, std::move(rest_stub), std::move(info->quota_project_id)));
   }
   return internal::InvalidArgumentError(
       "Unsupported credential type (" + cred_type +

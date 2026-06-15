@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "google/cloud/internal/oauth2_service_account_credentials.h"
+#include "google/cloud/common_options.h"
 #include "google/cloud/credentials.h"
 #include "google/cloud/internal/getenv.h"
 #include "google/cloud/internal/make_jwt_assertion.h"
@@ -113,6 +114,12 @@ StatusOr<ServiceAccountCredentialsInfo> ParseServiceAccountCredentials(
            nlohmann::json::iterator const& l) {
          if (l == credentials.end()) return;
          info.project_id = l->get<std::string>();
+       }},
+      {"quota_project_id", non_empty_field,
+       [&](ServiceAccountCredentialsInfo& info,
+           nlohmann::json::iterator const& l) {
+         if (l == credentials.end()) return;
+         info.quota_project_id = l->get<std::string>();
        }},
   };
 
@@ -340,6 +347,11 @@ StatusOr<std::vector<std::uint8_t>> ServiceAccountCredentials::SignBlob(
         GCP_ERROR_INFO());
   }
   return internal::SignUsingSha256(blob, info_.private_key);
+}
+
+absl::optional<std::string> ServiceAccountCredentials::quota_project_id() const {
+  if (options_.has<UserProjectOption>()) return absl::nullopt;
+  return info_.quota_project_id;
 }
 
 StatusOr<std::string> ServiceAccountCredentials::universe_domain() const {

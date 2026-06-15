@@ -55,6 +55,7 @@ struct ServiceAccountCredentialsInfo {
   bool enable_self_signed_jwt;
   absl::optional<std::string> universe_domain;
   absl::optional<std::string> project_id;
+  absl::optional<std::string> quota_project_id;
 };
 
 /// Indicates whether or not to use a self-signed JWT or issue a request to
@@ -282,6 +283,8 @@ class ServiceAccountCredentials : public oauth2_internal::Credentials {
   StatusOr<std::vector<std::uint8_t>> SignBlob(
       absl::optional<std::string> const& signing_account,
       std::string const& blob) const override;
+
+  absl::optional<std::string> quota_project_id() const override;
 
   std::string AccountEmail() const override { return info_.client_email; }
 

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "google/cloud/internal/oauth2_impersonate_service_account_credentials.h"
+#include "google/cloud/common_options.h"
 #include "google/cloud/testing_util/status_matchers.h"
 #include <gmock/gmock.h>
 #include <nlohmann/json.hpp>
@@ -221,6 +222,52 @@ TEST(ParseImpersonatedServiceAccountCredentialsWithoutAction, Success) {
   EXPECT_THAT(actual->quota_project_id, Optional<std::string>("my-project"));
   EXPECT_THAT(actual->source_credentials,
               AllOf(HasSubstr("type"), HasSubstr("authorized_user")));
+}
+
+TEST(ImpersonateServiceAccountCredentialsTest, QuotaProjectExplicit) {
+  auto mock = std::make_shared<MockMinimalIamCredentialsRest>();
+
+  auto config = google::cloud::internal::ImpersonateServiceAccountConfig(
+      google::cloud::MakeGoogleDefaultCredentials(),
+      "test-only-invalid@test.invalid",
+      Options{});
+
+  ImpersonateServiceAccountCredentials under_test(config, mock, "project-from-file");
+
+  EXPECT_THAT(under_test.quota_project_id(), Optional<std::string>("project-from-file"));
+}
+
+TEST(ImpersonateServiceAccountCredentialsTest, QuotaProjectOverridden) {
+  auto mock = std::make_shared<MockMinimalIamCredentialsRest>();
+
+  auto config = google::cloud::internal::ImpersonateServiceAccountConfig(
+      google::cloud::MakeGoogleDefaultCredentials(),
+      "test-only-invalid@test.invalid",
+      Options{}.set<UserProjectOption>("project-from-opts"));
+
+  ImpersonateServiceAccountCredentials under_test(config, mock, "project-from-file");
+
+  EXPECT_EQ(under_test.quota_project_id(), absl::nullopt);
+}
+
+TEST(ImpersonateServiceAccountCredentialsTest, AuthenticationHeadersIncludesQuotaProject) {
+  auto const now = std::chrono::system_clock::now();
+  auto mock = std::make_shared<MockMinimalIamCredentialsRest>();
+  EXPECT_CALL(*mock, GenerateAccessToken)
+      .WillOnce(
+          Return(make_status_or(AccessToken{"token1", now + minutes(30)})));
+
+  auto config = google::cloud::internal::ImpersonateServiceAccountConfig(
+      google::cloud::MakeGoogleDefaultCredentials(),
+      "test-only-invalid@test.invalid",
+      Options{});
+
+  ImpersonateServiceAccountCredentials under_test(config, mock, "project-from-file");
+
+  auto headers = under_test.AuthenticationHeaders(now, "https://foo.googleapis.com");
+  ASSERT_THAT(headers, IsOk());
+  EXPECT_THAT(*headers, ::testing::Contains(rest_internal::HttpHeader{
+                            "x-goog-user-project", "project-from-file"}));
 }
 
 }  // namespace

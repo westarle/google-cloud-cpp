@@ -54,10 +54,12 @@ class ImpersonateServiceAccountCredentials
    */
   explicit ImpersonateServiceAccountCredentials(
       google::cloud::internal::ImpersonateServiceAccountConfig const& config,
-      HttpClientFactory client_factory);
+      HttpClientFactory client_factory,
+      absl::optional<std::string> quota_project_id = absl::nullopt);
   ImpersonateServiceAccountCredentials(
       google::cloud::internal::ImpersonateServiceAccountConfig const& config,
-      std::shared_ptr<MinimalIamCredentialsRest> stub);
+      std::shared_ptr<MinimalIamCredentialsRest> stub,
+      absl::optional<std::string> quota_project_id = absl::nullopt);
 
   StatusOr<AccessToken> GetToken(
       std::chrono::system_clock::time_point tp) override;
@@ -68,10 +70,14 @@ class ImpersonateServiceAccountCredentials
 
   AllowedLocationsRequestType AllowedLocationsRequest() const override;
 
+  absl::optional<std::string> quota_project_id() const override;
+
  private:
   std::shared_ptr<MinimalIamCredentialsRest> stub_;
   GenerateAccessTokenRequest access_token_request_;
   ServiceAccountAllowedLocationsRequest allowed_locations_request_;
+  Options options_;
+  absl::optional<std::string> quota_project_id_;
 };
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

@@ -136,6 +136,13 @@ class Credentials {
   virtual StatusOr<std::string> project_id(Options const&) const;
 
   /**
+   * Return the quota project associated with the credentials, if any.
+   */
+  virtual absl::optional<std::string> quota_project_id() const {
+    return absl::nullopt;
+  }
+
+  /**
    * Returns only the "authorization" header if applicable for the credential
    * type.
    *
