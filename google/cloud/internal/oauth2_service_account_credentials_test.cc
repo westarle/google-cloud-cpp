@@ -230,6 +230,22 @@ TEST(ServiceAccountCredentialsTest, ServiceAccountUseOAuth) {
   }
 }
 
+TEST(ServiceAccountCredentialsTest, CreateFromJsonCustomUniverseDomainAndSubjectThrows) {
+  auto json = TestContents();
+  json["universe_domain"] = "custom-universe.net";
+
+  Options options;
+  options.set<SubjectOption>("user@foo.bar");
+
+  MockHttpClientFactory mock_http_client_factory;
+  auto credentials = CreateServiceAccountCredentialsFromJsonContents(
+      json.dump(), options, mock_http_client_factory.AsStdFunction());
+
+  EXPECT_THAT(credentials,
+              StatusIs(StatusCode::kInvalidArgument,
+                       HasSubstr("Domain-wide delegation (subject) is not supported with custom universe domains")));
+}
+
 TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWT) {
   auto info =
       ParseServiceAccountCredentials(MakeUniverseDomainTestContents(), "test");

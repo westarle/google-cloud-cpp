@@ -263,6 +263,13 @@ CreateServiceAccountCredentialsFromJsonContents(
   auto info = ParseServiceAccountCredentials(contents, "memory");
   if (!info) return info.status();
   ApplyServiceAccountCredentialsInfoOverrides(options, *info);
+
+  if (info->universe_domain.has_value() &&
+      info->universe_domain != GoogleDefaultUniverseDomain() &&
+      info->subject.has_value()) {
+    return internal::InvalidArgumentError("Domain-wide delegation (subject) is not supported with custom universe domains.", GCP_ERROR_INFO());
+  }
+
   // Verify this is usable before returning it.
   auto const tp = std::chrono::system_clock::time_point{};
   auto const components = AssertionComponentsFromInfo(*info, tp);
