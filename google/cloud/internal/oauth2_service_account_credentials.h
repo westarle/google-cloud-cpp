@@ -55,6 +55,7 @@ struct ServiceAccountCredentialsInfo {
   bool enable_self_signed_jwt;
   absl::optional<std::string> universe_domain;
   absl::optional<std::string> project_id;
+  absl::optional<std::string> quota_project_id;
 };
 
 /// Indicates whether or not to use a self-signed JWT or issue a request to
@@ -268,6 +269,10 @@ class ServiceAccountCredentials : public oauth2_internal::Credentials {
   StatusOr<AccessToken> GetToken(
       std::chrono::system_clock::time_point tp) override;
 
+  StatusOr<std::vector<rest_internal::HttpHeader>> AuthenticationHeaders(
+      std::chrono::system_clock::time_point tp,
+      std::string_view endpoint) override;
+
   /**
    * Create a RSA SHA256 signature of the blob using the Credential object.
    *
@@ -305,6 +310,7 @@ class ServiceAccountCredentials : public oauth2_internal::Credentials {
   ServiceAccountCredentialsInfo info_;
   Options options_;
   HttpClientFactory client_factory_;
+  std::string quota_project_id_;
 };
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

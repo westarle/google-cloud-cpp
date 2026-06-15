@@ -83,7 +83,7 @@ class Credentials {
    * @param endpoint the endpoint of the GCP service the RPC request will be
    *     sent to.
    */
-  StatusOr<std::vector<rest_internal::HttpHeader>> AuthenticationHeaders(
+  virtual StatusOr<std::vector<rest_internal::HttpHeader>> AuthenticationHeaders(
       std::chrono::system_clock::time_point tp, std::string_view endpoint);
 
   /**

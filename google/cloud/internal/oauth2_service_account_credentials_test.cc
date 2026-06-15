@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "google/cloud/internal/oauth2_service_account_credentials.h"
+#include "google/cloud/common_options.h"
 #include "google/cloud/credentials.h"
 #include "google/cloud/internal/base64_transforms.h"
 #include "google/cloud/internal/oauth2_credential_constants.h"
@@ -964,6 +965,66 @@ TEST(ServiceAccountCredentialsTest,
   };
 
   EXPECT_EQ(payload, expected_payload);
+}
+
+TEST(ServiceAccountCredentialsTest, QuotaProjectInjectedHeaders) {
+  auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
+  ASSERT_STATUS_OK(info);
+
+  MockHttpClientFactory mock_client_factory;
+  EXPECT_CALL(mock_client_factory, Call).Times(0);
+
+  // Test 1: Quota project provided in Options
+  {
+    auto credentials = std::make_shared<ServiceAccountCredentials>(
+        *info, Options{}.set<UserProjectOption>("options-quota-project"),
+        mock_client_factory.AsStdFunction());
+    auto const now = std::chrono::system_clock::now();
+    auto headers = credentials->AuthenticationHeaders(now, "my-endpoint");
+    ASSERT_STATUS_OK(headers);
+    EXPECT_THAT(*headers, Contains(rest_internal::HttpHeader{
+                              "x-goog-user-project", "options-quota-project"}));
+  }
+
+  // Test 2: Quota project provided in JSON info
+  {
+    auto info_with_quota = *info;
+    info_with_quota.quota_project_id = "json-quota-project";
+    auto credentials = std::make_shared<ServiceAccountCredentials>(
+        info_with_quota, Options{}, mock_client_factory.AsStdFunction());
+    auto const now = std::chrono::system_clock::now();
+    auto headers = credentials->AuthenticationHeaders(now, "my-endpoint");
+    ASSERT_STATUS_OK(headers);
+    EXPECT_THAT(*headers, Contains(rest_internal::HttpHeader{
+                              "x-goog-user-project", "json-quota-project"}));
+  }
+
+  // Test 3: Quota project in both, Options takes precedence
+  {
+    auto info_with_quota = *info;
+    info_with_quota.quota_project_id = "json-quota-project";
+    auto credentials = std::make_shared<ServiceAccountCredentials>(
+        info_with_quota,
+        Options{}.set<UserProjectOption>("options-quota-project"),
+        mock_client_factory.AsStdFunction());
+    auto const now = std::chrono::system_clock::now();
+    auto headers = credentials->AuthenticationHeaders(now, "my-endpoint");
+    ASSERT_STATUS_OK(headers);
+    EXPECT_THAT(*headers, Contains(rest_internal::HttpHeader{
+                              "x-goog-user-project", "options-quota-project"}));
+  }
+
+  // Test 4: No quota project provided
+  {
+    auto credentials = std::make_shared<ServiceAccountCredentials>(
+        *info, Options{}, mock_client_factory.AsStdFunction());
+    auto const now = std::chrono::system_clock::now();
+    auto headers = credentials->AuthenticationHeaders(now, "my-endpoint");
+    ASSERT_STATUS_OK(headers);
+    for (auto const& header : *headers) {
+      EXPECT_NE(header.name(), "x-goog-user-project");
+    }
+  }
 }
 
 }  // namespace

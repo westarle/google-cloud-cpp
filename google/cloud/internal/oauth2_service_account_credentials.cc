@@ -321,7 +321,25 @@ ServiceAccountCredentials::ServiceAccountCredentials(
           std::move(options),
           Options{}.set<ServiceAccountCredentialsTokenUriOption>(
               info_.token_uri))),
-      client_factory_(std::move(client_factory)) {}
+      client_factory_(std::move(client_factory)) {
+  if (options_.has<UserProjectOption>()) {
+    quota_project_id_ = options_.get<UserProjectOption>();
+  } else if (info_.quota_project_id.has_value()) {
+    quota_project_id_ = *info_.quota_project_id;
+  }
+}
+
+StatusOr<std::vector<rest_internal::HttpHeader>>
+ServiceAccountCredentials::AuthenticationHeaders(
+    std::chrono::system_clock::time_point tp, std::string_view endpoint) {
+  auto headers = Credentials::AuthenticationHeaders(tp, endpoint);
+  if (!headers) return headers;
+  if (!quota_project_id_.empty()) {
+    headers->push_back(
+        rest_internal::HttpHeader{"x-goog-user-project", quota_project_id_});
+  }
+  return headers;
+}
 
 StatusOr<AccessToken> ServiceAccountCredentials::GetToken(
     std::chrono::system_clock::time_point tp) {
