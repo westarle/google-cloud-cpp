@@ -387,7 +387,8 @@ bool ServiceAccountUseOAuth(ServiceAccountCredentialsInfo const& info) {
     return false;
   }
   if (info.private_key_id == P12PrivateKeyIdMarker() ||
-      !info.enable_self_signed_jwt) {
+      !info.enable_self_signed_jwt ||
+      info.subject.has_value()) {
     return true;
   }
   auto disable_jwt = google::cloud::internal::GetEnv(

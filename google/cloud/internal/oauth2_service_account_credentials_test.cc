@@ -230,6 +230,15 @@ TEST(ServiceAccountCredentialsTest, ServiceAccountUseOAuth) {
   }
 }
 
+TEST(ServiceAccountCredentialsTest, ServiceAccountUseOAuthWithSubject) {
+  auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
+  ASSERT_STATUS_OK(info);
+  EXPECT_FALSE(ServiceAccountUseOAuth(*info));
+
+  info->subject = "user@foo.bar";
+  EXPECT_TRUE(ServiceAccountUseOAuth(*info));
+}
+
 TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWT) {
   auto info =
       ParseServiceAccountCredentials(MakeUniverseDomainTestContents(), "test");
@@ -387,8 +396,6 @@ TEST(ServiceAccountCredentialsTest, RefreshWithSelfSignedJWT) {
 /// @test Verify that we can create service account credentials from a keyfile.
 TEST(ServiceAccountCredentialsTest,
      RefreshingSendsCorrectRequestBodyAndParsesResponseForNonDefaultVals) {
-  ScopedEnvironment disable_self_signed_jwt(
-      "GOOGLE_CLOUD_CPP_EXPERIMENTAL_DISABLE_SELF_SIGNED_JWT", "1");
 
   auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
   ASSERT_STATUS_OK(info);
