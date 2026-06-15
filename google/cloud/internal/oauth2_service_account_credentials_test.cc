@@ -572,6 +572,29 @@ TEST(ServiceAccountCredentialsTest, ParseEmptyFieldFails) {
 }
 
 /// @test Parsing a service account JSON string should detect invalid fields.
+TEST(ServiceAccountCredentialsTest, InvalidPrivateKeyYieldsNonOkStatus) {
+  auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
+  ASSERT_STATUS_OK(info);
+  info->private_key = "invalid-pem-private-key";
+
+  MockHttpClientFactory mock_client_factory;
+  EXPECT_CALL(mock_client_factory, Call).Times(0);
+
+  ServiceAccountCredentials credentials(
+      *info, Options{}, mock_client_factory.AsStdFunction());
+  auto const now = std::chrono::system_clock::now();
+
+  auto token_self_signed = credentials.GetToken(now);
+  EXPECT_THAT(token_self_signed, StatusIs(Not(StatusCode::kOk)));
+
+  {
+    ScopedEnvironment disable_self_signed_jwt(
+        "GOOGLE_CLOUD_CPP_EXPERIMENTAL_DISABLE_SELF_SIGNED_JWT", "1");
+    auto token_oauth = credentials.GetToken(now);
+    EXPECT_THAT(token_oauth, StatusIs(Not(StatusCode::kOk)));
+  }
+}
+
 TEST(ServiceAccountCredentialsTest, ParseInvalidTypeFieldFails) {
   std::string contents = R"""({
       "type": "service_account",
@@ -840,11 +863,12 @@ TEST(ServiceAccountCredentialsTest, CreateServiceAccountRefreshPayload) {
   auto assertion =
       MakeJWTAssertion(components.first, components.second, info->private_key);
   auto actual_payload = CreateServiceAccountRefreshPayload(*info, now);
+  ASSERT_STATUS_OK(actual_payload);
 
-  EXPECT_THAT(actual_payload, Contains(std::pair<std::string, std::string>(
-                                  "assertion", assertion)));
-  EXPECT_THAT(actual_payload, Contains(std::pair<std::string, std::string>(
-                                  "grant_type", kGrantParamUnescaped)));
+  EXPECT_THAT(*actual_payload, Contains(std::pair<std::string, std::string>(
+                                   "assertion", assertion)));
+  EXPECT_THAT(*actual_payload, Contains(std::pair<std::string, std::string>(
+                                   "grant_type", kGrantParamUnescaped)));
 }
 
 /// @test Parsing a refresh response with missing fields results in failure.

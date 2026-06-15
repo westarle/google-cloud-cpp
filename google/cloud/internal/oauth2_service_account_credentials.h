@@ -100,7 +100,7 @@ std::string MakeJWTAssertion(std::string const& header,
 /// Uses a ServiceAccountCredentialsInfo and the current time to construct a
 /// JWT assertion. The assertion combined with the grant type is used to create
 /// the refresh payload.
-std::vector<std::pair<std::string, std::string>>
+StatusOr<std::vector<std::pair<std::string, std::string>>>
 CreateServiceAccountRefreshPayload(ServiceAccountCredentialsInfo const& info,
                                    std::chrono::system_clock::time_point now);
 

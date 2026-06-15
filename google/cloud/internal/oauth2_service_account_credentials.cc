@@ -192,14 +192,17 @@ std::string MakeJWTAssertion(std::string const& header,
       .value();
 }
 
-std::vector<std::pair<std::string, std::string>>
+StatusOr<std::vector<std::pair<std::string, std::string>>>
 CreateServiceAccountRefreshPayload(ServiceAccountCredentialsInfo const& info,
                                    std::chrono::system_clock::time_point now) {
   std::string header;
   std::string payload;
   std::tie(header, payload) = AssertionComponentsFromInfo(info, now);
-  return {{"grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"},
-          {"assertion", MakeJWTAssertion(header, payload, info.private_key)}};
+  auto assertion = MakeJWTAssertionNoThrow(header, payload, info.private_key);
+  if (!assertion) return std::move(assertion).status();
+  return std::vector<std::pair<std::string, std::string>>{
+      {"grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"},
+      {"assertion", *std::move(assertion)}};
 }
 
 StatusOr<AccessToken> ParseServiceAccountRefreshResponse(
@@ -402,12 +405,13 @@ bool ServiceAccountCredentials::UseOAuth() {
 
 StatusOr<AccessToken> ServiceAccountCredentials::GetTokenOAuth(
     std::chrono::system_clock::time_point tp) const {
+  auto payload = CreateServiceAccountRefreshPayload(info_, tp);
+  if (!payload) return std::move(payload).status();
   auto client = client_factory_(options_);
   rest_internal::RestRequest request;
   request.SetPath(options_.get<ServiceAccountCredentialsTokenUriOption>());
-  auto payload = CreateServiceAccountRefreshPayload(info_, tp);
   rest_internal::RestContext context;
-  auto response = client->Post(context, request, payload);
+  auto response = client->Post(context, request, *payload);
   if (!response) return std::move(response).status();
   if (IsHttpError(**response)) return AsStatus(std::move(**response));
   return ParseServiceAccountRefreshResponse(**response, tp);
