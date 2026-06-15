@@ -233,8 +233,11 @@ StatusOr<std::string> MakeSelfSignedJWT(
     return absl::StrJoin(*info.scopes, " ");
   };
 
-  auto const header = nlohmann::json{
-      {"alg", "RS256"}, {"typ", "JWT"}, {"kid", info.private_key_id}};
+  auto header = nlohmann::json{
+      {"alg", "RS256"}, {"typ", "JWT"}};
+  if (!info.private_key_id.empty()) {
+    header["kid"] = info.private_key_id;
+  }
   // As much as possible, do the time arithmetic using the std::chrono types.
   // Convert to an integer only when we are dealing with timestamps since the
   // epoch. Note that we cannot use `time_t` directly because that might be a

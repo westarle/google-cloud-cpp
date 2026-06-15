@@ -321,6 +321,33 @@ TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWTWithScopes) {
               ElementsAreArray(decoded[2].begin(), decoded[2].end()));
 }
 
+TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWTMissingKid) {
+  auto info_json = TestContents();
+  info_json["private_key_id"] = "";
+  auto info = ParseServiceAccountCredentials(info_json.dump(), "test");
+  ASSERT_STATUS_OK(info);
+
+  auto const now = std::chrono::system_clock::now();
+  auto actual = MakeSelfSignedJWT(*info, now);
+  ASSERT_STATUS_OK(actual);
+
+  std::vector<std::string> components = absl::StrSplit(*actual, '.');
+  std::vector<std::string> decoded(components.size());
+  std::transform(components.begin(), components.end(), decoded.begin(),
+                 [](std::string const& e) {
+                   auto v = UrlsafeBase64Decode(e).value();
+                   return std::string{v.begin(), v.end()};
+                 });
+  ASSERT_THAT(3, decoded.size());
+  auto const header = nlohmann::json::parse(decoded[0], nullptr);
+  ASSERT_FALSE(header.is_null()) << "header=" << decoded[0];
+
+  auto const expected_header = nlohmann::json{
+      {"alg", "RS256"}, {"typ", "JWT"}};
+
+  ASSERT_EQ(expected_header, header) << "header=" << header;
+}
+
 /// @test Verify that we can create service account credentials from a keyfile.
 TEST(ServiceAccountCredentialsTest,
      RefreshingSendsCorrectRequestBodyAndParsesResponse) {
