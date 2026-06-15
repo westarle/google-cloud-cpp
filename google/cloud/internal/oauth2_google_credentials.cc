@@ -30,6 +30,7 @@
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <mutex>
 
 namespace google {
 namespace cloud {
@@ -182,17 +183,30 @@ StatusOr<std::unique_ptr<Credentials>> MaybeLoadCredsFromAdcPaths(
 
 StatusOr<std::shared_ptr<Credentials>> GoogleDefaultCredentials(
     Options const& options, HttpClientFactory client_factory) {
+  static std::mutex mu;
+  static std::weak_ptr<Credentials> cached_credentials;
+
+  std::lock_guard<std::mutex> lk(mu);
+  auto creds = cached_credentials.lock();
+  if (creds) return creds;
+
   // 1 and 2) Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable
   // is set or if the gcloud ADC file exists.
-  auto creds = MaybeLoadCredsFromAdcPaths(options, client_factory);
-  if (!creds) return std::move(creds).status();
-  if (*creds) return std::shared_ptr<Credentials>(*std::move(creds));
+  auto maybe_creds = MaybeLoadCredsFromAdcPaths(options, client_factory);
+  if (!maybe_creds) return std::move(maybe_creds).status();
 
-  // 3) Check for implicit environment-based credentials (GCE, GAE Flexible,
-  // Cloud Run or GKE Environment).
-  return std::shared_ptr<Credentials>(
-      std::make_shared<ComputeEngineCredentials>(options,
-                                                 std::move(client_factory)));
+  if (*maybe_creds) {
+    creds = std::shared_ptr<Credentials>(*std::move(maybe_creds));
+  } else {
+    // 3) Check for implicit environment-based credentials (GCE, GAE Flexible,
+    // Cloud Run or GKE Environment).
+    creds = std::shared_ptr<Credentials>(
+        std::make_shared<ComputeEngineCredentials>(options,
+                                                   std::move(client_factory)));
+  }
+
+  cached_credentials = creds;
+  return creds;
 }
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

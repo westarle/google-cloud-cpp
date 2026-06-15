@@ -447,6 +447,30 @@ TEST_F(GoogleCredentialsTest, MissingCredentialsViaGcloudFilePath) {
               StatusIs(StatusCode::kUnavailable, HasSubstr("bad hostname")));
 }
 
+
+TEST_F(GoogleCredentialsTest, MemoizesCredentials) {
+  auto const filename = TempFileName();
+  std::ofstream(filename) << kServiceAccountCredContents;
+  auto const env = ScopedEnvironment(GoogleAdcEnvVar(), filename);
+
+  MockHttpClientFactory client_factory;
+  EXPECT_CALL(client_factory, Call).Times(0).WillRepeatedly([](Options const&) {
+    return std::make_unique<MockRestClient>();
+  });
+
+  auto creds1 =
+      GoogleDefaultCredentials(Options{}, client_factory.AsStdFunction());
+  ASSERT_STATUS_OK(creds1);
+  ASSERT_THAT(*creds1, NotNull());
+
+  auto creds2 =
+      GoogleDefaultCredentials(Options{}, client_factory.AsStdFunction());
+  ASSERT_STATUS_OK(creds2);
+  ASSERT_THAT(*creds2, NotNull());
+
+  EXPECT_EQ(creds1->get(), creds2->get());
+}
+
 }  // namespace
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END
 }  // namespace oauth2_internal
