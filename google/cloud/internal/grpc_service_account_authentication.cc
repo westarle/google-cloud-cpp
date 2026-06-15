@@ -39,6 +39,7 @@ bool GrpcServiceAccountAuthentication::RequiresConfigureContext() const {
 Status GrpcServiceAccountAuthentication::ConfigureContext(
     grpc::ClientContext& context) {
   context.set_credentials(credentials_);
+  context.AddMetadata("x-goog-api-client", "cred-type/jwt");
   return Status{};
 }
 
@@ -46,6 +47,7 @@ future<StatusOr<std::shared_ptr<grpc::ClientContext>>>
 GrpcServiceAccountAuthentication::AsyncConfigureContext(
     std::shared_ptr<grpc::ClientContext> context) {
   context->set_credentials(credentials_);
+  context->AddMetadata("x-goog-api-client", "cred-type/jwt");
   return make_ready_future(make_status_or(std::move(context)));
 }
 

@@ -329,6 +329,16 @@ StatusOr<AccessToken> ServiceAccountCredentials::GetToken(
   return GetTokenSelfSigned(tp);
 }
 
+StatusOr<std::vector<rest_internal::HttpHeader>> ServiceAccountCredentials::AuthenticationHeaders(
+    std::chrono::system_clock::time_point tp, std::string_view endpoint) {
+  auto headers = Credentials::AuthenticationHeaders(tp, endpoint);
+  if (!headers) return headers;
+  if (!UseOAuth()) {
+    headers->push_back(rest_internal::HttpHeader{"x-goog-api-client", "cred-type/jwt"});
+  }
+  return headers;
+}
+
 StatusOr<std::vector<std::uint8_t>> ServiceAccountCredentials::SignBlob(
     absl::optional<std::string> const& signing_account,
     std::string const& blob) const {

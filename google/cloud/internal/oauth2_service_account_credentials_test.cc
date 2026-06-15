@@ -230,6 +230,27 @@ TEST(ServiceAccountCredentialsTest, ServiceAccountUseOAuth) {
   }
 }
 
+TEST(ServiceAccountCredentialsTest, AuthenticationHeadersAddsTelemetry) {
+  auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
+  ASSERT_STATUS_OK(info);
+  
+  MockHttpClientFactory mock_http_client_factory;
+  ServiceAccountCredentials credentials(
+      *info, Options{}, mock_http_client_factory.AsStdFunction());
+      
+  auto headers = credentials.AuthenticationHeaders(
+      std::chrono::system_clock::now(), "https://test.googleapis.com/");
+  ASSERT_STATUS_OK(headers);
+  
+  bool found_telemetry = false;
+  for (auto const& h : *headers) {
+    if (h.name() == "x-goog-api-client" && std::find(h.begin(), h.end(), "cred-type/jwt") != h.end()) {
+      found_telemetry = true;
+    }
+  }
+  EXPECT_TRUE(found_telemetry);
+}
+
 TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWT) {
   auto info =
       ParseServiceAccountCredentials(MakeUniverseDomainTestContents(), "test");
