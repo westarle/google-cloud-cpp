@@ -313,6 +313,38 @@ TEST_F(GoogleCredentialsTest, LoadUnknownTypeCredentials) {
                                     HasSubstr(filename))));
 }
 
+TEST_F(GoogleCredentialsTest, LoadUnsupportedTypeIdToken) {
+  auto const filename = TempFileName();
+  std::ofstream(filename) << R"""({"type": "id_token"})""";
+  auto const env = ScopedEnvironment(GoogleAdcEnvVar(), filename.c_str());
+
+  MockHttpClientFactory client_factory;
+  EXPECT_CALL(client_factory, Call).Times(0);
+  auto creds =
+      GoogleDefaultCredentials(Options{}, client_factory.AsStdFunction());
+  (void)std::remove(filename.c_str());
+  EXPECT_THAT(
+      creds, StatusIs(Not(StatusCode::kOk),
+                      AllOf(HasSubstr("Unsupported credential type (id_token)"),
+                            HasSubstr(filename))));
+}
+
+TEST_F(GoogleCredentialsTest, LoadUnsupportedTypeSigner) {
+  auto const filename = TempFileName();
+  std::ofstream(filename) << R"""({"type": "signer"})""";
+  auto const env = ScopedEnvironment(GoogleAdcEnvVar(), filename.c_str());
+
+  MockHttpClientFactory client_factory;
+  EXPECT_CALL(client_factory, Call).Times(0);
+  auto creds =
+      GoogleDefaultCredentials(Options{}, client_factory.AsStdFunction());
+  (void)std::remove(filename.c_str());
+  EXPECT_THAT(creds,
+              StatusIs(Not(StatusCode::kOk),
+                       AllOf(HasSubstr("Unsupported credential type (signer)"),
+                             HasSubstr(filename))));
+}
+
 TEST_F(GoogleCredentialsTest, LoadInvalidCredentials) {
   auto const filename = TempFileName();
   std::ofstream(filename) << R"""( not-a-json-object-string )""";
