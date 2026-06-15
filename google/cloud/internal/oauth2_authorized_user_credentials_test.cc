@@ -20,6 +20,7 @@
 #include "google/cloud/testing_util/mock_rest_client.h"
 #include "google/cloud/testing_util/mock_rest_response.h"
 #include "google/cloud/testing_util/status_matchers.h"
+#include "google/cloud/universe_domain_options.h"
 #include <gmock/gmock.h>
 #include <nlohmann/json.hpp>
 
@@ -129,8 +130,8 @@ TEST_F(AuthorizedUserCredentialsTest, ParseSimple) {
 }
 
 /// @test Verify that parsing an authorized user account JSON string with a
-/// non-empty universe_domain works.
-TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithUniverseDomain) {
+/// non-default universe_domain fails.
+TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithNonDefaultUniverseDomainFails) {
   std::string config = R"""({
       "client_id": "a-client-id.example.com",
       "client_secret": "a-123456ABCDEF",
@@ -142,12 +143,26 @@ TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithUniverseDomain) {
 
   auto actual =
       ParseAuthorizedUserCredentials(config, "test-data", "unused-uri");
+  EXPECT_THAT(actual, StatusIs(StatusCode::kInvalidArgument,
+                               HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+}
+
+/// @test Verify that parsing an authorized user account JSON string with default
+/// universe_domain works.
+TEST_F(AuthorizedUserCredentialsTest, ParseSimpleWithDefaultUniverseDomain) {
+  std::string config = R"""({
+      "client_id": "a-client-id.example.com",
+      "client_secret": "a-123456ABCDEF",
+      "refresh_token": "1/THETOKEN",
+      "token_uri": "https://oauth2.googleapis.com/test_endpoint",
+      "type": "magic_type",
+      "universe_domain": "googleapis.com"
+})""";
+
+  auto actual =
+      ParseAuthorizedUserCredentials(config, "test-data", "unused-uri");
   ASSERT_STATUS_OK(actual);
-  EXPECT_EQ("a-client-id.example.com", actual->client_id);
-  EXPECT_EQ("a-123456ABCDEF", actual->client_secret);
-  EXPECT_EQ("1/THETOKEN", actual->refresh_token);
-  EXPECT_EQ("https://oauth2.googleapis.com/test_endpoint", actual->token_uri);
-  EXPECT_EQ(actual->universe_domain, "my-ud.net");
+  EXPECT_EQ(actual->universe_domain, "googleapis.com");
 }
 
 /// @test Verify that parsing an authorized user account JSON string with a
@@ -322,6 +337,75 @@ TEST_F(AuthorizedUserCredentialsTest, ParseAuthorizedUserRefreshResponse) {
   EXPECT_EQ(token.expiration, now + expires_in);
   EXPECT_EQ(token.token, "access-token-r1");
 }
+
+TEST_F(AuthorizedUserCredentialsTest, GetTokenWithNonDefaultUniverseDomainInInfoFails) {
+  AuthorizedUserCredentialsInfo info;
+  info.client_id = "a-client-id.example.com";
+  info.client_secret = "a-123456ABCDEF";
+  info.refresh_token = "1/THETOKEN";
+  info.token_uri = "https://oauth2.googleapis.com/test_endpoint";
+  info.universe_domain = "my-ud.net";
+
+  MockHttpClientFactory client_factory;
+  AuthorizedUserCredentials credentials(info, {}, client_factory.AsStdFunction());
+  auto token = credentials.GetToken(std::chrono::system_clock::now());
+  EXPECT_THAT(token, StatusIs(StatusCode::kInvalidArgument,
+                              HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+}
+
+TEST_F(AuthorizedUserCredentialsTest, GetTokenWithNonDefaultUniverseDomainInOptionsFails) {
+  AuthorizedUserCredentialsInfo info;
+  info.client_id = "a-client-id.example.com";
+  info.client_secret = "a-123456ABCDEF";
+  info.refresh_token = "1/THETOKEN";
+  info.token_uri = "https://oauth2.googleapis.com/test_endpoint";
+  info.universe_domain = "googleapis.com";
+
+  MockHttpClientFactory client_factory;
+  Options options;
+  options.set<internal::UniverseDomainOption>("my-ud.net");
+  AuthorizedUserCredentials credentials(info, options, client_factory.AsStdFunction());
+  auto token = credentials.GetToken(std::chrono::system_clock::now());
+  EXPECT_THAT(token, StatusIs(StatusCode::kInvalidArgument,
+                              HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+}
+
+TEST_F(AuthorizedUserCredentialsTest, UniverseDomainWithNonDefaultUniverseDomainInInfoFails) {
+  AuthorizedUserCredentialsInfo info;
+  info.client_id = "a-client-id.example.com";
+  info.client_secret = "a-123456ABCDEF";
+  info.refresh_token = "1/THETOKEN";
+  info.token_uri = "https://oauth2.googleapis.com/test_endpoint";
+  info.universe_domain = "my-ud.net";
+
+  MockHttpClientFactory client_factory;
+  AuthorizedUserCredentials credentials(info, {}, client_factory.AsStdFunction());
+  EXPECT_THAT(credentials.universe_domain(),
+              StatusIs(StatusCode::kInvalidArgument,
+                       HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+  EXPECT_THAT(credentials.universe_domain(Options{}),
+              StatusIs(StatusCode::kInvalidArgument,
+                       HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+}
+
+TEST_F(AuthorizedUserCredentialsTest, UniverseDomainWithNonDefaultUniverseDomainInOptionsFails) {
+  AuthorizedUserCredentialsInfo info;
+  info.client_id = "a-client-id.example.com";
+  info.client_secret = "a-123456ABCDEF";
+  info.refresh_token = "1/THETOKEN";
+  info.token_uri = "https://oauth2.googleapis.com/test_endpoint";
+  info.universe_domain = "googleapis.com";
+
+  MockHttpClientFactory client_factory;
+  AuthorizedUserCredentials credentials(info, {}, client_factory.AsStdFunction());
+
+  Options options;
+  options.set<internal::UniverseDomainOption>("my-ud.net");
+  EXPECT_THAT(credentials.universe_domain(options),
+              StatusIs(StatusCode::kInvalidArgument,
+                       HasSubstr("AuthorizedUserCredentials only support the default universe domain")));
+}
+
 
 }  // namespace
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

@@ -15,6 +15,7 @@
 #include "google/cloud/internal/oauth2_authorized_user_credentials.h"
 #include "google/cloud/internal/make_status.h"
 #include "google/cloud/internal/oauth2_universe_domain.h"
+#include "google/cloud/universe_domain_options.h"
 #include <nlohmann/json.hpp>
 
 namespace google {
@@ -54,6 +55,12 @@ StatusOr<AuthorizedUserCredentialsInfo> ParseAuthorizedUserCredentials(
 
   auto universe_domain = GetUniverseDomainFromCredentialsJson(credentials);
   if (!universe_domain.ok()) return std::move(universe_domain).status();
+  if (*universe_domain != GoogleDefaultUniverseDomain()) {
+    return internal::InvalidArgumentError(
+        "AuthorizedUserCredentials only support the default universe domain (" +
+            GoogleDefaultUniverseDomain() + ").",
+        GCP_ERROR_INFO());
+  }
 
   return AuthorizedUserCredentialsInfo{
       credentials.value(client_id_key, ""),
@@ -96,6 +103,9 @@ AuthorizedUserCredentials::AuthorizedUserCredentials(
 
 StatusOr<AccessToken> AuthorizedUserCredentials::GetToken(
     std::chrono::system_clock::time_point tp) {
+  auto ud_status = universe_domain(options_);
+  if (!ud_status.ok()) return ud_status.status();
+
   rest_internal::RestRequest request;
   request.SetPath(info_.token_uri);
   request.AddHeader("content-type", "application/x-www-form-urlencoded");
@@ -110,6 +120,32 @@ StatusOr<AccessToken> AuthorizedUserCredentials::GetToken(
   if (!response.ok()) return std::move(response).status();
   if (IsHttpError(**response)) return AsStatus(std::move(**response));
   return ParseAuthorizedUserRefreshResponse(**response, tp);
+}
+
+StatusOr<std::string> AuthorizedUserCredentials::universe_domain() const {
+  if (info_.universe_domain != GoogleDefaultUniverseDomain()) {
+    return internal::InvalidArgumentError(
+        "AuthorizedUserCredentials only support the default universe domain (" +
+            GoogleDefaultUniverseDomain() + ").",
+        GCP_ERROR_INFO());
+  }
+  return info_.universe_domain;
+}
+
+StatusOr<std::string> AuthorizedUserCredentials::universe_domain(
+    google::cloud::Options const& options) const {
+  auto ud_status = universe_domain();
+  if (!ud_status.ok()) return ud_status;
+  if (options.has<internal::UniverseDomainOption>()) {
+    auto const& ud = options.get<internal::UniverseDomainOption>();
+    if (ud != GoogleDefaultUniverseDomain()) {
+      return internal::InvalidArgumentError(
+          "AuthorizedUserCredentials only support the default universe domain (" +
+              GoogleDefaultUniverseDomain() + ").",
+          GCP_ERROR_INFO());
+    }
+  }
+  return GoogleDefaultUniverseDomain();
 }
 
 GOOGLE_CLOUD_CPP_INLINE_NAMESPACE_END

@@ -85,6 +85,9 @@ class AuthorizedUserCredentials : public Credentials {
   StatusOr<AccessToken> GetToken(
       std::chrono::system_clock::time_point tp) override;
 
+  StatusOr<std::string> universe_domain() const override;
+  StatusOr<std::string> universe_domain(Options const& options) const override;
+
  private:
   AuthorizedUserCredentialsInfo info_;
   Options options_;
