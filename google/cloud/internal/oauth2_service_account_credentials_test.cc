@@ -321,6 +321,29 @@ TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWTWithScopes) {
               ElementsAreArray(decoded[2].begin(), decoded[2].end()));
 }
 
+TEST(ServiceAccountCredentialsTest, MakeSelfSignedJWTEmptyScopesFallback) {
+  auto info = ParseServiceAccountCredentials(MakeTestContents(), "test");
+  ASSERT_STATUS_OK(info);
+  info->scopes = std::set<std::string>{};
+
+  auto const now = std::chrono::system_clock::now();
+  auto actual = MakeSelfSignedJWT(*info, now);
+  ASSERT_STATUS_OK(actual);
+
+  std::vector<std::string> components = absl::StrSplit(*actual, '.');
+  std::vector<std::string> decoded(components.size());
+  std::transform(components.begin(), components.end(), decoded.begin(),
+                 [](std::string const& e) {
+                   auto v = UrlsafeBase64Decode(e).value();
+                   return std::string{v.begin(), v.end()};
+                 });
+  ASSERT_THAT(3, decoded.size());
+  auto const payload = nlohmann::json::parse(decoded[1], nullptr);
+  ASSERT_FALSE(payload.is_null()) << "payload=" << decoded[1];
+
+  EXPECT_EQ(payload["scope"], "https://www.googleapis.com/auth/cloud-platform");
+}
+
 /// @test Verify that we can create service account credentials from a keyfile.
 TEST(ServiceAccountCredentialsTest,
      RefreshingSendsCorrectRequestBodyAndParsesResponse) {
