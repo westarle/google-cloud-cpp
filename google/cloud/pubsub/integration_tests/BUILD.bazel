@@ -24,6 +24,7 @@ licenses(["notice"])  # Apache 2.0
     srcs = [test],
     tags = [
         "integration-test",
+        "manual",
     ],
     deps = [
         "//:common",
